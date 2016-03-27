@@ -34,7 +34,7 @@ class fetch extends  base{
         $this->jscookie =   time() - 2 * 3600 * 24 - mt_rand(1, 9);
         $this->checkread($this->log);
         $this->checkread($this->cookie);
-        file_put_contents($this->log, '');
+       // file_put_contents($this->log, '');
         if(self::$mysql == null){
             try{
                 $mysqlconf = $this->conf['mysql'];
@@ -165,15 +165,10 @@ else{
                     $time = time();
                     $day = $this->days;
                     while($day > 0){
-                        $l1 = explode("\r\n", file_get_contents(PATH . '/source/hb.txt'));
-                        $rand = array_rand($l1, 2);
-                        $line = $l1[$rand[0]];
-                        $line2 = $l1[$rand[1]];
                         if(intval($this->record) > 0 && $this->record >= $i && $this->jsxu == 1) {
                         }else{
                             $date = date("Y-m-d", time() - $day * 24 * 3600);
                             $this->todo($date, $line, $line2, $i);
-                            sleep(1);
                         }
                         --$day;
                         ++$i;
