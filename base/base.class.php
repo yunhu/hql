@@ -16,7 +16,6 @@ class base{
     }
 
     public function http($url,$cookie='',$proip='', $proport=80, $referer='', $host='' ){
-        $url = 'http://www.umetrip.com/mskyweb/fs/fa.do?dep=TSN&arr=PVG&date=2016-03-28&channel=';
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
