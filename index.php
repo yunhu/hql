@@ -13,5 +13,5 @@ $msg = array(
 );
 include PATH  .'/base/base.class.php';
 include PATH  .'/base/fetch.class.php';
-$start = new fetch();
-$start->start();
+$start = new fetch(1);//获取提前1天的数据
+$start->start('p1.txt');

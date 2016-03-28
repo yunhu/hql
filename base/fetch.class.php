@@ -20,11 +20,14 @@ class fetch extends  base{
     public $jsxu = 1; //是否开启断点 0关,1开
     public $regurl = 'http://122.119.123.62:86/piwik/piwik.php?action_name=%E8%88%AA%E6%97%85%E7%BA%B5%E6%A8%AA&idsite=2&rec=1';
     public $jsession = '';
-    public function  __construct(){
+    public $lastday = '';
+    public function  __construct($day=1){
         parent::__construct();
+        $this->lastday = strtotime(date("Y-m-d"));
         $this->log =  PATH . '/log/log.txt';
         $this->cookie =  PATH . '/cookie/cookie.txt';
         $this->record=  intval(file_get_contents(PATH . '/record/record.txt'));
+        $this->days = $day;//抓取提前多少天的数据
         if($this->record && $this->record > 0 && $this->jsxu == 1){
             echo '检测到上次执行未完成,将继续从断点开始,如果想重新开始,请删除record.txt中的内容' . "\n";
             sleep(3);
@@ -33,8 +36,14 @@ class fetch extends  base{
         }
         $this->jscookie =   time() - 2 * 3600 * 24 - mt_rand(1, 9);
         $this->checkread($this->log);
-        $this->checkread($this->cookie);
-       // file_put_contents($this->log, '');
+        //$this->checkread($this->cookie);
+        file_put_contents($this->log, '');
+        $this->getMysql();
+
+    }
+
+
+    public function getMysql(){
         if(self::$mysql == null){
             try{
                 $mysqlconf = $this->conf['mysql'];
@@ -48,10 +57,10 @@ class fetch extends  base{
                 $this->code = $e->getCode();
                 $this->msg = $e->getMessage();
                 $this->output();
+                exit('mysql error!');
             }
         }
     }
-
 
 
     public function checkread($path){
@@ -61,21 +70,7 @@ class fetch extends  base{
         }
     }
 
-    public function doa(){
-      $this->ips = include PATH .'/source/ip.conf.php';
-        if($this->ips) {
-            $rand = array_rand($this->ips, 1);
-            list($ip, $port) = explode(':', $tihs->ips[$rand]);
-            $con = $this->http($this->url, $ip, $port);
-        }
 
-else{
-    $con = $this->http($this->url);
-}
-        $tmp = PATH . '/base/tmp';
-        file_put_contents($tmp, '');
-        file_put_contents($tmp, $con);
-}
 
 
     public function match($str){
@@ -86,13 +81,14 @@ else{
         return trim($k);
     }
     public function dolog($data, $date, $start, $end, $res){
-
+        if($res == 1) $res = '成功';
         $str = "时间：" . date("Y-m-d H:i:s")  . "data:" . json_encode($data) . "日期：" .$date . "起飞:" . $start . "结束：" . $end ."插入结果：" .$res ."\n";
         echo $str;
         file_put_contents($this->log, $str, FILE_APPEND);
 
     }
     public function insert($data, $date, $start, $end){
+        $this->getMysql();
         $sql = "insert into list_flight(date, flyairport, destination, flightnum,planfly, actualfly,flybuilding,desbuilding,plandes,actualdes,flightstatus,create_time ) values (?,?,?,?,?,?,?,?,?,?,?,?)";
         $sth = self::$mysql->prepare($sql);
         $sth->bindParam(1,$date);
@@ -151,8 +147,11 @@ else{
         //return  $this->getCookie() . ';' . '_pk_id.2.134a=' . $str .';'.$this->jscookie . '.'  .$h . '.' .time() . '.' . $vtime;
     }
 
-    public function start(){
-        $file = PATH . '/source/hb.txt';
+    public function start($t){
+        $file = PATH . '/source/' . $t;
+        if(!file_exists($file)){
+             exit('file error!');
+        }
         $file2 = PATH . '/source/hb2.txt';
         $fp = fopen($file, 'r');
         $i = 1;
@@ -168,10 +167,15 @@ else{
                         if(intval($this->record) > 0 && $this->record >= $i && $this->jsxu == 1) {
                         }else{
                             $date = date("Y-m-d", time() - $day * 24 * 3600);
-                            $this->todo($date, $line, $line2, $i);
+                            if(strtotime($date) >= $this->lastday){
+                                $date = date("Y-m-d", $this->lastday);
+                            }
+                            $r = $this->todo($date, $line, $line2, $i);
                         }
-                        --$day;
-                        ++$i;
+                        if($r !== 1) {
+                            --$day;
+                            ++$i;
+                        }
                     }
                 }
 
@@ -183,6 +187,7 @@ else{
 
     public function todo($date, $start, $end, $x){
         $url = $this->url . 'dep=' . $start. '&arr=' .$end. '&date=' . $date . '&channel=';
+        /*
         $this->ips = include PATH .'/source/ip.conf.php';
         $reg = $this->reg();
         $comcookie = $reg[0] . ';_pk_id.2.134a=' . $reg[1] . '.' . $reg[2] . '.' . $reg[3] . '.'. $reg[4] . '.' . $reg[5] .  ';all=http%3A//www.umetrip.com/img/index/h_pic_3.jpg%2Chttp%3A//www.umetrip.com/img/index/h_pic_1.jpg%2Chttp%3A//www.umetrip.com/img/index/h_pic_2.jpg%2C0;isCheck=true0;';
@@ -191,6 +196,11 @@ else{
         }
         if($this->jsession)
             $comcookie = trim($this->jsession) . trim($comcookie);
+        */
+        //$con = $this->http($url,$comcookie,'',80, 'www.umetrip.com');
+        $con = $this->http($url,'','',80, 'www.umetrip.com');
+        if(!$con)sleep(1);
+        /*
         if($this->ips) {
             $rand = array_rand($this->ips, 1);
             list($ip, $port) = explode(':', $tihs->ips[$rand]);
@@ -198,10 +208,12 @@ else{
         }else{
             $con = $this->http($url,$comcookie,'',80, 'www.umetrip.com');
         }
+        */
         if(preg_match('/谁把你的网线拔了吧/', $con, $check)){
             file_put_contents(PATH . '/record/record.txt', --$x);
-            echo '已经被封,程序退出';
-            exit;
+            echo '已经被封,waiting!' . "\n";
+            return 1;
+            //exit;
         }
         if(preg_match('/未找到您搜索的航班/', $con, $checkagain)) {
             echo '当前第' . $x . '次抓取' . ';抓取的url为:' . $url . ';未找到您搜索的航班！' . "\n";
@@ -211,6 +223,8 @@ else{
                 preg_match_all('/<span (.*?)>(.*?)<\/span>/is', $match[0], $title);
                 //8行一个
                 if ($title[0]) {
+                    echo '当前第' . $x . '次抓取' . ';抓取的url为:' . $url . ';抓取成功正在处理数据！' . "\n";
+
                     $num = count($title[0]);
                     for ($i = 0; $i <= $num; ++$i) {
                         $type = $i % 8;
