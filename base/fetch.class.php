@@ -29,8 +29,9 @@ class fetch extends  base{
         $this->record=  intval(file_get_contents(PATH . '/record/record.txt'));
         $this->days = $day;//抓取提前多少天的数据
         if($this->record && $this->record > 0 && $this->jsxu == 1){
-            echo '检测到上次执行未完成,将继续从断点开始,如果想重新开始,请删除record.txt中的内容' . "\n";
-            sleep(3);
+            //echo '检测到上次执行未完成,将继续从断点开始,如果想重新开始,请删除record.txt中的内容' . "\n";
+            echo  'it will be continue from ' . $this->record .  "\n";
+            sleep(1);
         }else{
             file_put_contents(PATH . '/record/record.txt', '');
         }
@@ -148,6 +149,37 @@ class fetch extends  base{
     }
 
     public function start($t){
+
+        $file = PATH . '/source/zl/' . $t;
+        $fp = fopen($file, 'r');
+        $i = 1;
+        if(!file_exists($file)){
+            exit('file error!');
+        }
+        while(($line = fgets($fp)) !== false){
+            $line = trim($line);
+            list($line1, $line2) = explode("\t", $line);
+                $time = time();
+                $day = $this->days;
+            if($line1 && $line2) {
+                while ($day > 0) {
+                    if (intval($this->record) > 0 && $this->record >= $i && $this->jsxu == 1) {
+                    } else {
+                        $date = date("Y-m-d", time() - $day * 24 * 3600);
+                        if (strtotime($date) >= $this->lastday) {
+                            $date = date("Y-m-d", $this->lastday);
+                        }
+                        $r = $this->todo($date, $line1, $line2, $i);
+                    }
+                    if ($r !== 1) {
+                        --$day;
+                        ++$i;
+                    }
+                }
+            }
+        }
+        file_put_contents(PATH . '/record/record.txt', '');
+        /*
         $file = PATH . '/source/' . $t;
         if(!file_exists($file)){
              exit('file error!');
@@ -183,6 +215,7 @@ class fetch extends  base{
             fclose($fp2);
         }
         file_put_contents(PATH . '/record/record.txt', '');
+        */
     }
 
     public function todo($date, $start, $end, $x){
