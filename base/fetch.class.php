@@ -198,8 +198,12 @@ class fetch extends  base{
             $comcookie = trim($this->jsession) . trim($comcookie);
         */
         //$con = $this->http($url,$comcookie,'',80, 'www.umetrip.com');
-        $con = $this->http($url,'','',80, 'www.umetrip.com');
-        if(!$con)sleep(1);
+        $con = '';
+        while(!$con){
+            $con = $this->http($url,$comcookie,'',80, 'www.umetrip.com');
+            if(!$con)sleep(1);
+
+        }
         /*
         if($this->ips) {
             $rand = array_rand($this->ips, 1);
