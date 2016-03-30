@@ -13,5 +13,5 @@ $msg = array(
 );
 include PATH  .'/base/base.class.php';
 include PATH  .'/base/fetch.class.php';
-$start = new fetch(1);//获取提前1天的数据
-$start->start('p1.txt');
+$start = new fetch('list_flight', 'airport_con', 'flight_con');//要扫的表名,表2名,表3名
+$start->start();

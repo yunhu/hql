@@ -21,16 +21,23 @@ class fetch extends  base{
     public $regurl = 'http://122.119.123.62:86/piwik/piwik.php?action_name=%E8%88%AA%E6%97%85%E7%BA%B5%E6%A8%AA&idsite=2&rec=1';
     public $jsession = '';
     public $lastday = '';
-    public function  __construct($day=1){
+    public $table = '';
+    public $tablecount = 0;
+    public $limit = 1; //一次取1条处理
+    public $contable = 'airport_con';
+    public $flycontable = 'flight_con';
+    public function  __construct($table, $ari,$flight){
+        $this->contable = $ari;
+        $this->flycontable = $flight;
         parent::__construct();
+        $this->table =  $table;
         $this->lastday = strtotime(date("Y-m-d"));
         $this->log =  PATH . '/log/log.txt';
         $this->cookie =  PATH . '/cookie/cookie.txt';
         $this->record=  intval(file_get_contents(PATH . '/record/record.txt'));
-        $this->days = $day;//抓取提前多少天的数据
         if($this->record && $this->record > 0 && $this->jsxu == 1){
             echo '检测到上次执行未完成,将继续从断点开始,如果想重新开始,请删除record.txt中的内容' . "\n";
-            sleep(3);
+            sleep(1);
         }else{
             file_put_contents(PATH . '/record/record.txt', '');
         }
@@ -39,6 +46,10 @@ class fetch extends  base{
         //$this->checkread($this->cookie);
         file_put_contents($this->log, '');
         $this->getMysql();
+        $this->tablecount = $this->fetchCount();
+        if(!$this->tablecount){
+            echo 'empty talbe ,exit' . "\n";
+        }
 
     }
 
@@ -87,6 +98,13 @@ class fetch extends  base{
         file_put_contents($this->log, $str, FILE_APPEND);
 
     }
+    public function fetchCount(){
+        $this->getMysql();
+        $sql = "select *  from " . $this->table;
+        $sth = self::$mysql->prepare($sql);
+        $sth->execute();
+        return $sth->rowCount();
+    }
     public function insert($data, $date, $start, $end){
         $this->getMysql();
         $sql = "insert into list_flight(date, flyairport, destination, flightnum,planfly, actualfly,flybuilding,desbuilding,plandes,actualdes,flightstatus,create_time ) values (?,?,?,?,?,?,?,?,?,?,?,?)";
@@ -105,6 +123,16 @@ class fetch extends  base{
         $sth->bindParam(12,time());
         $res = $sth->execute();
         $this->dolog($data, $date, $start, $end, $res);
+    }
+
+    public function fetchtable($offset){
+        $this->getMysql();
+        $sql  = "select * from " . $this->table . " limit $offset, 1 ";
+        $sth = self::$mysql->prepare($sql);
+        $sth->execute();
+        $row = $sth->fetch(PDO::FETCH_ASSOC);
+        return $row;
+
     }
 
     public function getCookie($url = ''){
@@ -147,7 +175,184 @@ class fetch extends  base{
         //return  $this->getCookie() . ';' . '_pk_id.2.134a=' . $str .';'.$this->jscookie . '.'  .$h . '.' .time() . '.' . $vtime;
     }
 
-    public function start($t){
+    public function tfetch(){
+        $url = 'http://www.umetrip.com/mskyweb/fs/fc.do?&channel=&flightNo=KY9581&date=2016-03-30';
+        $con = $this->http($url, '','',80, 'www.umetrip.com');
+        var_dump($con);
+        file_put_contents('tmp.txt', $con);
+    }
+
+    public function  getp3($con){
+        preg_match('/主飞航班：(.*?)(.*?)<\/p>/is', $con, $maint);
+        $main = explode(',', $maint[2]);
+        $mainflight= trim($main[0]);
+        preg_match('/<div class="p_info">(.*?)<\/div>(.*?)<\!\-\-机场\-\-\->/is', $con,$infot);
+        preg_match_all('/<ul>(.*?)<\/ul>/is',$infot[0], $infom);
+        $return = array();
+        foreach($infom[0] as  $k=>$v){
+            $tmp = '';
+            preg_match_all('/<li (.*?)>(.*?)<span>(.*?)<\/span>/is', $v, $tmp);
+            $return[$k][]= str_replace('公里','', $tmp[3][1]);
+            preg_match('/(.*?)小时(.*?)分/', $tmp[3][2], $ptime);
+            $return[$k][]= intval($ptime[1]) * 60 + intval($ptime[2]);
+            list($type, $age) = explode('/', $tmp[3][3]);
+            $age = str_replace('月', '', $age);
+            $age = str_replace('年', '', $age);
+            $return[$k][] =$type;
+            $return[$k][] =$age;
+            $return[$k][] =$mainflight;
+        }
+        return $return;
+    }
+
+    public function tofetch($comdata){
+
+        $date = $date;
+        $flightnum = $flight;
+        $date = date("Y-m-d" ,strtotime($comdata['date']));
+        $flightnum = $comdata['flightnum'];
+        $url = "http://www.umetrip.com/mskyweb/fs/fc.do?&channel=&flightNo={$flightnum}&date={$date}";
+        $con = '';
+        while(!$con){
+            $con = $this->http($url, '','',80, 'www.umetrip.com');
+            if(!$con)sleep(1);
+
+        }
+        if(preg_match('/谁把你的网线拔了吧/', $con, $check)){
+            echo '已经被封,waiting!' . "\n";
+            return 1;
+            //exit;
+        }
+        $p3arr = $this->getp3($con);
+        $con = file_get_contents('./tmp.txt');
+        preg_match('/<\!\-\-机场\-\-\->(.*?)<div id="footer">/is', $con, $tmp);
+        preg_match_all('/<div class="fly_box">(.*?)<\/p>(.*?)<div class="clear"><\/div>/is', $tmp[0], $mm);
+        $res[1] = $mm[0];
+        if($res[1]) {
+            $tnum = count($res[1]);
+            $fnumus = $tnum - 1;
+            for ($i = 0; $i < $tnum; ++$i) {
+                $txt = '';
+                $ahead = '';
+                $aheadt = '';
+                $visiablet = '';
+                $flowt = '';
+                $tw = '';
+                $airportpre = '';
+                $airport = '';
+                $aheadflight ='';
+                $aheadtime = '';
+                $visiable = '';
+                $flow = '';
+                $tem = '';
+                $weather = '';
+                preg_match('/机场(.*)\((.*)\)/is', $res[1][$i], $txt);
+                $airport = trim($txt[2]);
+                preg_match('/前序航班(.*?)\[/is', $res[1][$i], $ahead);
+                $aheadflight = trim($ahead[1]);
+                preg_match('/已于(.*?)到达/is', $res[1][$i], $aheadt);
+                if($aheadt[1])
+                $aheadtime  = $date . " {$aheadt[1]}";
+                preg_match('/能见度\：(.*?)<\/p>/is', $res[1][$i], $visiablet);
+                $visiable = trim(str_replace('m','', $visiablet[1]));
+                preg_match('/流量：(.*?)<\/p>/is', $res[1][$i], $flowt);
+                $flow = trim($flowt[1]);
+                preg_match('/<div class="f_r">(.*?)<p>(.*)℃(.*?)<b>(.*?)<\/b>/is', $res[1][$i], $tw);
+                $tem = trim($tw[2]);
+                $weather = trim($tw[4]);
+                if($i < $fnumus){
+                    preg_match('/机场(.*)\((.*)\)/is', $res[1][$i+1], $txtpre);
+                    $airportpre = trim($txtpre[2]);
+                    $this->addflightcon($airport, $airportpre,$p3arr[$i],0, $comdata);
+                }
+                $this->addairprot($tem, $weather, $airport, $aheadflight, $aheadtime, $visiable,$flow,$date, $flightnum,$date, $flightnum);
+        }
+            if($fnumus >= 2){
+                $totaltime = 0;
+                $totalkm = 0;
+                $newdata = array();
+                foreach($p3arr as $v){
+                    $totalkm += $v[0];
+                    $totaltime += $v[1];
+                }
+                $newdata[0] = $totalkm;
+                $newdata[1] = $totaltime;
+                $newdata[2] = $p3arr[0][2];
+                $newdata[3] = $p3arr[0][3];
+                $newdata[4] = $p3arr[0][4];
+                $this->addflightcon($comdata['flyairport'], $comdata['destination'], $newdata, 1, $comdata);
+            }
+        }
+    }
+
+    public function addflightcon($start, $end, $data,$type =0, $comdata){
+        $this->getMysql();
+        $sql = "insert into {$this->flycontable}(`date`,flightnum,fly,arrived,totalmileage,totaltime,planetype,planeage,mainflight,createtime,`type`) values (?,?,?,?,?,?,?,?,?,?,?)";
+        $sth = self::$mysql->prepare($sql);
+        $sth->bindParam(1,$comdata['date']);
+        $sth->bindParam(2,$comdata['flightnum']);
+        $sth->bindParam(3,$start);
+        $sth->bindParam(4,$end);
+        $sth->bindParam(5,$data[0]);
+        $sth->bindParam(6,$data[1]);
+        $sth->bindParam(7,$data[2]);
+        $sth->bindParam(8,$data[3]);
+        if($type == 0) {
+            $data[4] = '';
+        }
+        $sth->bindParam(9, $data[4]);
+        $sth->bindParam(10,time());
+        $sth->bindParam(11,$type);
+        $res = $sth->execute();
+        $this->dologaircon($sql, $res);
+
+    }
+    //参数就这样吧,不整理了
+    public function addairprot($tem, $weather, $airport, $aheadflight, $aheadtime, $visiable,$flow, $date, $flightnum){
+
+        $this->getMysql();
+        $sql = "insert into {$this->contable}(flightnum,airport,temperature,weather,visibility,flow,aheadflight,aheadarrive,`date`,createtime) values (?,?,?,?,?,?,?,?,?,?)";
+        $sth = self::$mysql->prepare($sql);
+        $sth->bindParam(1,$flightnum);
+        $sth->bindParam(2,$airport);
+        $sth->bindParam(3,$tem);
+        $sth->bindParam(4,$weather);
+        $sth->bindParam(5,$visiable);
+        $sth->bindParam(6,$flow);
+        $sth->bindParam(7,$aheadflight);
+        $sth->bindParam(8,$aheadtime ? $aheadtime : null);
+        $sth->bindParam(9,$date);
+        $sth->bindParam(10,time());
+        $res = $sth->execute();
+        $this->dologaircon($sql, $res);
+    }
+    public function dologaircon($data, $res){
+        if($res == 1) $res = 'succeed!';
+        $str = "sql:{$data} 执行:". $res . "\n";
+        echo $str;
+        file_put_contents($this->log, $str, FILE_APPEND);
+    }
+
+    public function start(){
+        $url = '';
+        $num = 0;
+        while($num < $this->tablecount){
+            if(intval($this->record) > 0 && $this->record > $num && $this->jsxu == 1) {
+                ++$num;
+            }else{
+                $data = $this->fetchtable($num);
+                $r = $this->tofetch($data);
+                while($r === 1){
+                    $r = $this->tofetch($data);
+                    echo 'just waiting unlock!'. "\n";
+                    sleep(1);
+                }
+                ++$num;
+                file_put_contents(PATH . '/record/record.txt', $num);
+            }
+        }
+
+        /*
         $file = PATH . '/source/' . $t;
         if(!file_exists($file)){
              exit('file error!');
@@ -171,6 +376,8 @@ class fetch extends  base{
                                 $date = date("Y-m-d", $this->lastday);
                             }
                             $r = $this->todo($date, $line, $line2, $i);
+                            var_dump($r);
+                            die;
                         }
                         if($r !== 1) {
                             --$day;
@@ -183,6 +390,7 @@ class fetch extends  base{
             fclose($fp2);
         }
         file_put_contents(PATH . '/record/record.txt', '');
+        */
     }
 
     public function todo($date, $start, $end, $x){
