@@ -224,7 +224,6 @@ class fetch extends  base{
             //exit;
         }
         $p3arr = $this->getp3($con);
-        $con = file_get_contents('./tmp.txt');
         preg_match('/<\!\-\-机场\-\-\->(.*?)<div id="footer">/is', $con, $tmp);
         preg_match_all('/<div class="fly_box">(.*?)<\/p>(.*?)<div class="clear"><\/div>/is', $tmp[0], $mm);
         $res[1] = $mm[0];
@@ -320,7 +319,10 @@ class fetch extends  base{
         $sth->bindParam(5,$visiable);
         $sth->bindParam(6,$flow);
         $sth->bindParam(7,$aheadflight);
-        $sth->bindParam(8,$aheadtime ? $aheadtime : null);
+        if(!$aheadtime){
+            $aheadtime = null;
+        }
+        $sth->bindParam(8,$aheadtime);
         $sth->bindParam(9,$date);
         $sth->bindParam(10,time());
         $res = $sth->execute();
