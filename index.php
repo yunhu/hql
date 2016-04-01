@@ -13,5 +13,6 @@ $msg = array(
 );
 include PATH  .'/base/base.class.php';
 include PATH  .'/base/fetch.class.php';
-$start = new fetch('list_flight', 'airport_con', 'flight_con');//要扫的表名,表2名,表3名
+$start = new fetch('2016-03-29');//日期 例如 2015-03-30如果不填,则会默认跑前一天的.
+//$start = new fetch();//日期则会默认跑前一天的.
 $start->start();

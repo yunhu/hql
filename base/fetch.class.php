@@ -24,13 +24,19 @@ class fetch extends  base{
     public $table = '';
     public $tablecount = 0;
     public $limit = 1; //一次取1条处理
-    public $contable = 'airport_con';
-    public $flycontable = 'flight_con';
-    public function  __construct($table, $ari,$flight){
-        $this->contable = $ari;
-        $this->flycontable = $flight;
+    public $contable = '';
+    public $flycontable = '';
+    public $date = ''; //要抓取的日期
+
+    public function  __construct($date=''){
+        if($date)
+            $this->date = $date;
+        else
+            $this->date = date("Y-m-d", strtotime('-1 day'));
+        $this->table = 'list_flight_' . $this->date;
+        $this->contable = 'airport_con_' . $this->date;
+        $this->flycontable = 'flight_con_' . $this->date;
         parent::__construct();
-        $this->table =  $table;
         $this->lastday = strtotime(date("Y-m-d"));
         $this->log =  PATH . '/log/log.txt';
         $this->cookie =  PATH . '/cookie/cookie.txt';
@@ -41,19 +47,86 @@ class fetch extends  base{
         }else{
             file_put_contents(PATH . '/record/record.txt', '');
         }
-        $this->jscookie =   time() - 2 * 3600 * 24 - mt_rand(1, 9);
         $this->checkread($this->log);
-        //$this->checkread($this->cookie);
         file_put_contents($this->log, '');
         $this->getMysql();
-        $this->tablecount = $this->fetchCount();
-        if(!$this->tablecount){
-            echo 'empty talbe ,exit' . "\n";
-        }
+        $this->createTable();
 
     }
 
+    public function  createTable(){
+        $sql1 = 'DROP TABLE IF EXISTS  `' . $this->table. '`;
+CREATE TABLE `'.$this->table. '` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT \'主键\',
+  `date` datetime NOT NULL COMMENT \'日期\',
+  `flyairport` char(6) NOT NULL DEFAULT \'\' COMMENT \'起飞机场\',
+  `destination` char(6) NOT NULL DEFAULT \'\' COMMENT \'到达地\',
+  `flightnum` char(20) NOT NULL DEFAULT \'\' COMMENT \'航班号\',
+  `planfly` char(30) NOT NULL DEFAULT \'\' COMMENT \'计划起飞\',
+  `flybuilding` char(30) NOT NULL DEFAULT \'\' COMMENT \'起飞楼\',
+  `desbuilding` char(30) NOT NULL DEFAULT \'\' COMMENT \'到达航站楼\',
+  `plandes` char(30) NOT NULL DEFAULT \'\' COMMENT \'计划到达\',
+  `actualdes` char(30) NOT NULL DEFAULT \'\' COMMENT \'实际到达\',
+  `flightstatus` char(60) NOT NULL DEFAULT \'\' COMMENT \'航班状态\',
+  `create_time` int(11) unsigned NOT NULL DEFAULT \'0\' COMMENT \'创建时间\',
+  `update_time` int(11) unsigned NOT NULL DEFAULT \'0\' COMMENT \'更新时间\',
+  `actualfly` char(30) NOT NULL DEFAULT \'\' COMMENT \'实际行飞\',
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM AUTO_INCREMENT=84 DEFAULT CHARSET=utf8;
 
+SET FOREIGN_KEY_CHECKS = 1;';
+
+
+        $sql2 = 'DROP TABLE IF EXISTS `'.$this->contable.'`;
+CREATE TABLE `'.$this->contable.'` (
+  `id` int(10) unsigned NOT NULL /*!50606 COLUMN_FORMAT FIXED */ AUTO_INCREMENT COMMENT \'主键\',
+  `flightnum` char(30) NOT NULL DEFAULT \'\' COMMENT \'航班号\',
+  `airport` char(30) NOT NULL DEFAULT \'\' COMMENT \'机场\',
+  `temperature` char(30) NOT NULL DEFAULT \'\' COMMENT \'温度\',
+  `weather` char(50) NOT NULL DEFAULT \'\' COMMENT \'天气\',
+  `visibility` char(30) NOT NULL DEFAULT \'\' COMMENT \'能力度\',
+  `flow` char(50) NOT NULL DEFAULT \'\' COMMENT \'流量\',
+  `aheadflight` char(30) NOT NULL DEFAULT \'\' COMMENT \' 前序航班\',
+  `aheadarrive` datetime DEFAULT NULL COMMENT \' 前序航班到达时间\',
+  `date` datetime NOT NULL COMMENT \'日期\',
+  `createtime` int(11) NOT NULL DEFAULT \'0\' COMMENT \'创建时间 \',
+  `updatetime` int(11) NOT NULL DEFAULT \'0\' COMMENT \'更新时间 \',
+  `fetchnum` int(11) NOT NULL DEFAULT \'1\' COMMENT \'抓取次数\',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+SET FOREIGN_KEY_CHECKS = 1;';
+        $sql3 = 'DROP TABLE IF EXISTS `'.$this->flycontable.'`;
+CREATE TABLE `'.$this->flycontable.'` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT \'主键\',
+  `date` datetime NOT NULL COMMENT \'日期\',
+  `flightnum` char(30) NOT NULL DEFAULT \'\' COMMENT \'航班号\',
+  `fly` char(30) NOT NULL DEFAULT \'\' COMMENT \'起飞地\',
+  `arrived` char(30) NOT NULL DEFAULT \'\' COMMENT \'到达地\',
+  `totalmileage` int(11) NOT NULL DEFAULT \'0\' COMMENT \'总量程单位公里\',
+  `totaltime` int(11) NOT NULL DEFAULT \'0\' COMMENT \'单位分\',
+  `planetype` char(30) NOT NULL DEFAULT \'\' COMMENT \'机型\',
+  `planeage` double NOT NULL COMMENT \'机龄\',
+  `mainflight` char(150) NOT NULL DEFAULT \'\' COMMENT \'主飞航班\',
+  `createtime` int(11) unsigned NOT NULL DEFAULT \'0\' COMMENT \'创建时间\',
+  `updatetime` int(11) unsigned NOT NULL DEFAULT \'0\' COMMENT \'更新时间 \',
+  `fetchnum` int(10) unsigned NOT NULL DEFAULT \'1\' COMMENT \'抓取次数\',
+  `type` tinyint(3) unsigned NOT NULL DEFAULT \'0\' COMMENT \'标识是否累加航程\',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+SET FOREIGN_KEY_CHECKS = 1;';
+        $this->getMysql();
+        $sth1 = self::$mysql->prepare($sql1);
+        $sth2 = self::$mysql->prepare($sql2);
+        $sth3 = self::$mysql->prepare($sql3);
+        if($sth1->execute()&&$sth2->execute()&&$sth3->execute()){
+            echo "create table success! \n";
+        }else{
+            exit("create table faild! \n");
+        }
+die;
+    }
     public function getMysql(){
         if(self::$mysql == null){
             try{
@@ -154,26 +227,7 @@ class fetch extends  base{
         return $this->http($url, $cookie,'',80,'http://www.umetrip.com/mskyweb/inc/flySearch.html','122.119.123.62:86');
     }
 
-    public function reg(){
-        $h =abs(date("H") -  8);
-        $str = substr(md5(uniqid()), 16);
-        $vtime = time() - rand(0,20);
-        $this->regurl .= '&r=' . mt_rand(111111, 599999);
-        $this->regurl .= '&h=' . date("H");
-        $this->regurl .= '&m=' . date("i");
-        $this->regurl .= '&s=' . date("s");
-        $this->regurl .= '&url=http%3A%2F%2Fwww.umetrip.com%2Fmskyweb%2Finc%2FflySearch.html&urlref=http%3A%2F%2Fwww.umetrip.com%2F';
-        $this->regurl .= '&_id='  . $str;
-        $this->regurl .= '&_idts=' . $this->jscookie;
-        $this->regurl .= '&_idvc=' . $h;
-        $this->regurl .= '&_idn=0' ;
-        $this->regurl .= '&_refts=0' ;
-        $this->regurl .= '&_viewts=' . $vtime;
-        $this->regurl .= '&send_image=0&pdf=1&qt=0&realp=0&wma=0&dir=0&fla=1&java=0&gears=0&ag=0&cookie=1&res=2880x1800&gt_ms=1';
 
-        return array($this->getCookie(),$str, $this->jscookie, $h, time(), $vtime);
-        //return  $this->getCookie() . ';' . '_pk_id.2.134a=' . $str .';'.$this->jscookie . '.'  .$h . '.' .time() . '.' . $vtime;
-    }
 
     public function tfetch(){
         $url = 'http://www.umetrip.com/mskyweb/fs/fc.do?&channel=&flightNo=KY9581&date=2016-03-30';
@@ -333,7 +387,11 @@ class fetch extends  base{
         file_put_contents($this->log, $str, FILE_APPEND);
     }
 
+    public function fetchcon(){
+        die;
+    }
     public function start(){
+        $this->fetchcon();
         $url = '';
         $num = 0;
         while($num < $this->tablecount){
