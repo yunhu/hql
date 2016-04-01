@@ -19,6 +19,7 @@ class fetch extends base
     public $autocheck = 5; //cookie检测时间5分
     public $jscookie = '';
     public $record = '';
+    public $record2 = '';
     public $jsxu = 1; //是否开启断点 0关,1开
     public $regurl = 'http://122.119.123.62:86/piwik/piwik.php?action_name=%E8%88%AA%E6%97%85%E7%BA%B5%E6%A8%AA&idsite=2&rec=1';
     public $jsession = '';
@@ -29,9 +30,11 @@ class fetch extends base
     public $contable = '';
     public $flycontable = '';
     public $date = ''; //要抓取的日期
-
-    public function __construct($date = '')
+    public $file = '';
+    public $flag_ok = 99999999;
+    public function __construct($date = '', $file = 'zl.txt')
     {
+        $this->file = $file;
         if ($date)
             $this->date = $date;
         else
@@ -44,12 +47,9 @@ class fetch extends base
         $this->log = PATH . '/log/log.txt';
         $this->cookie = PATH . '/cookie/cookie.txt';
         $this->record = intval(file_get_contents(PATH . '/record/record.txt'));
-        if ($this->record && $this->record > 0 && $this->jsxu == 1) {
-            echo '检测到上次执行未完成,将继续从断点开始,如果想重新开始,请删除record.txt中的内容' . "\n";
-            sleep(1);
-        } else {
-            file_put_contents(PATH . '/record/record.txt', '');
-        }
+        $this->record2 = intval(file_get_contents(PATH . '/record/record2.txt'));
+
+        $this->start();
         $this->checkread($this->log);
         file_put_contents($this->log, '');
         $this->getMysql();
@@ -296,7 +296,6 @@ SET FOREIGN_KEY_CHECKS = 1;';
             //exit;
         }
         $p3arr = $this->getp3($con);
-        $con = file_get_contents('./tmp.txt');
         preg_match('/<\!\-\-机场\-\-\->(.*?)<div id="footer">/is', $con, $tmp);
         preg_match_all('/<div class="fly_box">(.*?)<\/p>(.*?)<div class="clear"><\/div>/is', $tmp[0], $mm);
         $res[1] = $mm[0];
@@ -410,19 +409,45 @@ SET FOREIGN_KEY_CHECKS = 1;';
         file_put_contents($this->log, $str, FILE_APPEND);
     }
 
-    public function fetchcon($t)
+    public function fetchcity()
     {
-
+        $file = PATH . '/source/zl/' . $this->file;
+        $fp = fopen($file, 'r');
+        $i = 1;
+        if(!file_exists($file)){
+            exit('file error!');
+        }
+        while(($line = fgets($fp)) !== false){
+            $line = trim($line);
+            list($line1, $line2) = explode("\t", $line);
+            $time = time();
+            if($line1 && $line2) {
+                    if (intval($this->record) > 0 && $this->record >= $i && $this->jsxu == 1) {
+                    } else {
+                        $date = date("Y-m-d", time() - $day * 24 * 3600);
+                        if (strtotime($date) >= $this->lastday) {
+                            $date = date("Y-m-d", $this->lastday);
+                        }
+                        $r = $this->todo($date, $line1, $line2, $i);
+                    }
+                    if ($r !== 1) {
+                        --$day;
+                        ++$i;
+                    }
+            }
+        }
+        file_put_contents(PATH . '/record/record.txt', '');
 
     }
 
-    public function start()
-    {
-        $this->fetchcon();
-        $url = '';
+    public function fetchcon(){
+        $this->tablecount = $this->fetchCount();
+        if(!$this->tablecount){
+            exit("no effect rows !\n");
+        }
         $num = 0;
         while ($num < $this->tablecount) {
-            if (intval($this->record) > 0 && $this->record > $num && $this->jsxu == 1) {
+            if (intval($this->record2) > 0 && $this->record2 > $num && $this->jsxu == 1) {
                 ++$num;
             } else {
                 $data = $this->fetchtable($num);
@@ -433,49 +458,63 @@ SET FOREIGN_KEY_CHECKS = 1;';
                     sleep(1);
                 }
                 ++$num;
-                file_put_contents(PATH . '/record/record.txt', $num);
+                file_put_contents(PATH . '/record/record2.txt', $num);
             }
         }
+        file_put_contents(PATH . '/record/record2.txt', '');
+    }
+    public function start()
+    {
+        //检查 第一部分是否有记录
+        if($this->record && $this->record > 0){
+            //已经完成 ,则进行第二部分
+            if($this->record == $this->flag_ok){
+                //检查第二部分
+                if($this->record2 && $this->record2 > 0){
+                    if($this->record2 == $this->flag_ok){
+
+                    }
+                }else{
+                    //已经完成
+                    echo "fetch ok!\n";
+                }
+            }else{
+                echo '检测到上次执行未完成,将继续从断点开始,如果想重新开始,请删除record.txt中的内容' . "\n";
+                sleep(1);
+                $this->fetchcity();
+            }
+
+
+        }else{
+
+        }
+
+
+        if($this->record = $this->flag_ok)
+
+        if ($this->record && $this->record > 0 && $this->jsxu == 1) {
+            echo '检测到上次执行未完成,将继续从断点开始,如果想重新开始,请删除record.txt中的内容' . "\n";
+            sleep(1);
+            $this->fetchcity();
+        } else {
+            if ($this->record2 && $this->record2 > 0 && $this->jsxu == 1) {
+                echo '检测到上次执行未完成,将继续从断点开始,如果想重新开始,请删除record2.txt中的内容' . "\n";
+                sleep(1);
+                $this->fetchcon();
+            } else {
+                file_put_contents(PATH . '/record/record2.txt', '');
+            }
+            file_put_contents(PATH . '/record/record.txt', '');
+            eixt();
+        }
+
+        $this->fetchcon();
 
         /*
-        $file = PATH . '/source/' . $t;
-        if(!file_exists($file)){
-             exit('file error!');
-        }
-        $file2 = PATH . '/source/hb2.txt';
-        $fp = fopen($file, 'r');
-        $i = 1;
-        while(($line = fgets($fp)) !== false){
-            $line = trim($line);
-            $fp2 = fopen($file2, 'r');
-            while(($line2 = fgets($fp2)) !== false) {
-                $line2 = trim($line2);
-                if($line != $line2){
-                    $time = time();
-                    $day = $this->days;
-                    while($day > 0){
-                        if(intval($this->record) > 0 && $this->record >= $i && $this->jsxu == 1) {
-                        }else{
-                            $date = date("Y-m-d", time() - $day * 24 * 3600);
-                            if(strtotime($date) >= $this->lastday){
-                                $date = date("Y-m-d", $this->lastday);
-                            }
-                            $r = $this->todo($date, $line, $line2, $i);
-                            var_dump($r);
-                            die;
-                        }
-                        if($r !== 1) {
-                            --$day;
-                            ++$i;
-                        }
-                    }
-                }
-
-            }
-            fclose($fp2);
-        }
-        file_put_contents(PATH . '/record/record.txt', '');
+        $this->fetchcity();
+        $this->fetchcon();
         */
+
     }
 
     public function todo($date, $start, $end, $x)

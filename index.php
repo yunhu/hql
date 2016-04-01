@@ -13,6 +13,5 @@ $msg = array(
 );
 include PATH  .'/base/base.class.php';
 include PATH  .'/base/fetch.class.php';
-$start = new fetch('2016-03-29');//日期 例如 2015-03-30如果不填,则会默认跑前一天的.
+$start = new fetch('2016-03-29' );//日期 例如 2015-03-30如果不填,则会默认跑前一天的. 后面的文件名暂时不用管
 //$start = new fetch();//日期则会默认跑前一天的.
-$start->start('zl.txt');
