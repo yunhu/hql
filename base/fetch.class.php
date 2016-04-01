@@ -169,12 +169,14 @@ class fetch extends  base{
                         if (strtotime($date) >= $this->lastday) {
                             $date = date("Y-m-d", $this->lastday);
                         }
-                        $r = $this->todo($date, $line1, $line2, $i);
+                        while( $this->todo($date, $line1, $line2, $i) === 1){
+                            echo "deny ip! sleep 1 sec!" ;
+                            sleep(1);
+                        }
+
                     }
-                    if ($r !== 1) {
                         --$day;
                         ++$i;
-                    }
                 }
             }
         }
