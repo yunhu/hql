@@ -49,18 +49,18 @@ class fetch extends base
         $this->record = intval(file_get_contents(PATH . '/record/record.txt'));
         $this->record2 = intval(file_get_contents(PATH . '/record/record2.txt'));
 
-        $this->start();
         $this->checkread($this->log);
         file_put_contents($this->log, '');
         $this->getMysql();
         $this->createTable();
+        $this->start();
 
     }
 
     public function createTable()
     {
-        $sql1 = 'DROP TABLE IF EXISTS  `' . $this->table . '`;
-CREATE TABLE `' . $this->table . '` (
+        $sql1 =
+'CREATE TABLE IF NOT EXISTS `' . $this->table . '` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT \'主键\',
   `date` datetime NOT NULL COMMENT \'日期\',
   `flyairport` char(6) NOT NULL DEFAULT \'\' COMMENT \'起飞机场\',
@@ -81,8 +81,7 @@ CREATE TABLE `' . $this->table . '` (
 SET FOREIGN_KEY_CHECKS = 1;';
 
 
-        $sql2 = 'DROP TABLE IF EXISTS `' . $this->contable . '`;
-CREATE TABLE `' . $this->contable . '` (
+        $sql2 = 'CREATE TABLE IF NOT EXISTS `' . $this->contable . '` (
   `id` int(10) unsigned NOT NULL /*!50606 COLUMN_FORMAT FIXED */ AUTO_INCREMENT COMMENT \'主键\',
   `flightnum` char(30) NOT NULL DEFAULT \'\' COMMENT \'航班号\',
   `airport` char(30) NOT NULL DEFAULT \'\' COMMENT \'机场\',
@@ -100,8 +99,7 @@ CREATE TABLE `' . $this->contable . '` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 SET FOREIGN_KEY_CHECKS = 1;';
-        $sql3 = 'DROP TABLE IF EXISTS `' . $this->flycontable . '`;
-CREATE TABLE `' . $this->flycontable . '` (
+        $sql3 = 'CREATE TABLE IF NOT EXISTS `' . $this->flycontable . '` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT \'主键\',
   `date` datetime NOT NULL COMMENT \'日期\',
   `flightnum` char(30) NOT NULL DEFAULT \'\' COMMENT \'航班号\',
@@ -122,14 +120,18 @@ CREATE TABLE `' . $this->flycontable . '` (
 SET FOREIGN_KEY_CHECKS = 1;';
         $this->getMysql();
         $sth1 = self::$mysql->prepare($sql1);
-        $sth2 = self::$mysql->prepare($sql2);
-        $sth3 = self::$mysql->prepare($sql3);
-        if ($sth1->execute() && $sth2->execute() && $sth3->execute()) {
+        $res1 = $sth1->execute();
+        $sth1 = self::$mysql->prepare($sql2);
+        $res2 = $sth1->execute();
+        $sth1 = self::$mysql->prepare($sql3);
+        $res3 = $sth1->execute();
+
+        if ($res1 && $res2 && $res3) {
+
             echo "create table success! \n";
         } else {
             exit("create table faild! \n");
         }
-        die;
     }
 
     public function getMysql()
@@ -183,7 +185,7 @@ SET FOREIGN_KEY_CHECKS = 1;';
     public function fetchCount()
     {
         $this->getMysql();
-        $sql = "select *  from " . $this->table;
+        $sql = 'select *  from `'. $this->table . '`';
         $sth = self::$mysql->prepare($sql);
         $sth->execute();
         return $sth->rowCount();
@@ -192,7 +194,7 @@ SET FOREIGN_KEY_CHECKS = 1;';
     public function insert($data, $date, $start, $end)
     {
         $this->getMysql();
-        $sql = "insert into list_flight(date, flyairport, destination, flightnum,planfly, actualfly,flybuilding,desbuilding,plandes,actualdes,flightstatus,create_time ) values (?,?,?,?,?,?,?,?,?,?,?,?)";
+        $sql = "insert into `{$this->table}`(date, flyairport, destination, flightnum,planfly, actualfly,flybuilding,desbuilding,plandes,actualdes,flightstatus,create_time ) values (?,?,?,?,?,?,?,?,?,?,?,?)";
         $sth = self::$mysql->prepare($sql);
         $sth->bindParam(1, $date);
         $sth->bindParam(2, $start);
@@ -213,7 +215,7 @@ SET FOREIGN_KEY_CHECKS = 1;';
     public function fetchtable($offset)
     {
         $this->getMysql();
-        $sql = "select * from " . $this->table . " limit $offset, 1 ";
+        $sql = "select * from `" . $this->table . "` limit $offset, 1 ";
         $sth = self::$mysql->prepare($sql);
         $sth->execute();
         $row = $sth->fetch(PDO::FETCH_ASSOC);
@@ -359,7 +361,7 @@ SET FOREIGN_KEY_CHECKS = 1;';
     public function addflightcon($start, $end, $data, $type = 0, $comdata)
     {
         $this->getMysql();
-        $sql = "insert into {$this->flycontable}(`date`,flightnum,fly,arrived,totalmileage,totaltime,planetype,planeage,mainflight,createtime,`type`) values (?,?,?,?,?,?,?,?,?,?,?)";
+        $sql = "insert into `{$this->flycontable}`(`date`,flightnum,fly,arrived,totalmileage,totaltime,planetype,planeage,mainflight,createtime,`type`) values (?,?,?,?,?,?,?,?,?,?,?)";
         $sth = self::$mysql->prepare($sql);
         $sth->bindParam(1, $comdata['date']);
         $sth->bindParam(2, $comdata['flightnum']);
@@ -385,7 +387,7 @@ SET FOREIGN_KEY_CHECKS = 1;';
     {
 
         $this->getMysql();
-        $sql = "insert into {$this->contable}(flightnum,airport,temperature,weather,visibility,flow,aheadflight,aheadarrive,`date`,createtime) values (?,?,?,?,?,?,?,?,?,?)";
+        $sql = "insert into `{$this->contable}`(flightnum,airport,temperature,weather,visibility,flow,aheadflight,aheadarrive,`date`,createtime) values (?,?,?,?,?,?,?,?,?,?)";
         $sth = self::$mysql->prepare($sql);
         $sth->bindParam(1, $flightnum);
         $sth->bindParam(2, $airport);
@@ -394,7 +396,10 @@ SET FOREIGN_KEY_CHECKS = 1;';
         $sth->bindParam(5, $visiable);
         $sth->bindParam(6, $flow);
         $sth->bindParam(7, $aheadflight);
-        $sth->bindParam(8, $aheadtime ? $aheadtime : null);
+        if(!$aheadtime){
+            $aheadtime = null;
+        }
+        $sth->bindParam(8,$aheadtime);
         $sth->bindParam(9, $date);
         $sth->bindParam(10, time());
         $res = $sth->execute();
@@ -420,23 +425,19 @@ SET FOREIGN_KEY_CHECKS = 1;';
         while(($line = fgets($fp)) !== false){
             $line = trim($line);
             list($line1, $line2) = explode("\t", $line);
-            $time = time();
             if($line1 && $line2) {
                     if (intval($this->record) > 0 && $this->record >= $i && $this->jsxu == 1) {
+                        ++$i;
                     } else {
-                        $date = date("Y-m-d", time() - $day * 24 * 3600);
-                        if (strtotime($date) >= $this->lastday) {
-                            $date = date("Y-m-d", $this->lastday);
+                        while($this->todo($this->date, $line1, $line2, $i) === 1){
+                            echo "deny ip! sleep 1 second and try again $i \n";
+                            sleep(1);
                         }
-                        $r = $this->todo($date, $line1, $line2, $i);
-                    }
-                    if ($r !== 1) {
-                        --$day;
                         ++$i;
                     }
             }
         }
-        file_put_contents(PATH . '/record/record.txt', '');
+        file_put_contents(PATH . '/record/record.txt', $this->flag_ok);
 
     }
 
@@ -461,54 +462,35 @@ SET FOREIGN_KEY_CHECKS = 1;';
                 file_put_contents(PATH . '/record/record2.txt', $num);
             }
         }
+
+        file_put_contents(PATH . '/record/record.txt', '');
         file_put_contents(PATH . '/record/record2.txt', '');
     }
     public function start()
     {
         //检查 第一部分是否有记录
         if($this->record && $this->record > 0){
-            //已经完成 ,则进行第二部分
             if($this->record == $this->flag_ok){
-                //检查第二部分
-                if($this->record2 && $this->record2 > 0){
-                    if($this->record2 == $this->flag_ok){
-
-                    }
-                }else{
-                    //已经完成
-                    echo "fetch ok!\n";
-                }
-            }else{
-                echo '检测到上次执行未完成,将继续从断点开始,如果想重新开始,请删除record.txt中的内容' . "\n";
-                sleep(1);
-                $this->fetchcity();
-            }
-
-
-        }else{
-
-        }
-
-
-        if($this->record = $this->flag_ok)
-
-        if ($this->record && $this->record > 0 && $this->jsxu == 1) {
-            echo '检测到上次执行未完成,将继续从断点开始,如果想重新开始,请删除record.txt中的内容' . "\n";
-            sleep(1);
-            $this->fetchcity();
-        } else {
-            if ($this->record2 && $this->record2 > 0 && $this->jsxu == 1) {
-                echo '检测到上次执行未完成,将继续从断点开始,如果想重新开始,请删除record2.txt中的内容' . "\n";
+                echo "is's continue from task two!\n";
                 sleep(1);
                 $this->fetchcon();
-            } else {
-                file_put_contents(PATH . '/record/record2.txt', '');
+            }else{
+                echo "is's continue from task one!\n";
+                sleep(1);
+                $this->fetchcity();
+                $this->fetchcon();
             }
-            file_put_contents(PATH . '/record/record.txt', '');
-            eixt();
+
+        }else{
+            //从新开始
+            echo "is's a new task!\n";
+            sleep(1);
+            $this->fetchcity();
+            $this->fetchcon();
         }
 
-        $this->fetchcon();
+
+
 
         /*
         $this->fetchcity();
@@ -520,6 +502,7 @@ SET FOREIGN_KEY_CHECKS = 1;';
     public function todo($date, $start, $end, $x)
     {
         $url = $this->url . 'dep=' . $start . '&arr=' . $end . '&date=' . $date . '&channel=';
+            file_put_contents(PATH . '/record/tmp.txt', $x . $start . $end . "\n", FILE_APPEND);
         /*
         $this->ips = include PATH .'/source/ip.conf.php';
         $reg = $this->reg();
@@ -533,7 +516,7 @@ SET FOREIGN_KEY_CHECKS = 1;';
         //$con = $this->http($url,$comcookie,'',80, 'www.umetrip.com');
         $con = '';
         while (!$con) {
-            $con = $this->http($url, $comcookie, '', 80, 'www.umetrip.com');
+            $con = $this->http($url, '', '', 80, 'www.umetrip.com');
             if (!$con) sleep(1);
 
         }
@@ -548,7 +531,6 @@ SET FOREIGN_KEY_CHECKS = 1;';
         */
         if (preg_match('/谁把你的网线拔了吧/', $con, $check)) {
             file_put_contents(PATH . '/record/record.txt', --$x);
-            echo '已经被封,waiting!' . "\n";
             return 1;
             //exit;
         }
