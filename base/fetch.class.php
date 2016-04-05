@@ -185,7 +185,9 @@ SET FOREIGN_KEY_CHECKS = 1;';
     public function fetchCount()
     {
         $this->getMysql();
-        $sql = 'select *  from `'. $this->table . '`';
+        //$sql = 'select *  from `'. $this->table . '`';
+        $sql = 'SELECT count(DISTINCT flightnum) from `'. $this->table . '`';
+        var_dump($sql);
         $sth = self::$mysql->prepare($sql);
         $sth->execute();
         return $sth->rowCount();
@@ -215,7 +217,8 @@ SET FOREIGN_KEY_CHECKS = 1;';
     public function fetchtable($offset)
     {
         $this->getMysql();
-        $sql = "select * from `" . $this->table . "` limit $offset, 1 ";
+        //$sql = "select * from `" . $this->table . "` limit $offset, 1 ";
+        $sql = "SELECT DISTINCT flightnum,left(date,10) as date from`" . $this->table . "` limit $offset, 1 ";
         $sth = self::$mysql->prepare($sql);
         $sth->execute();
         $row = $sth->fetch(PDO::FETCH_ASSOC);
@@ -281,8 +284,6 @@ SET FOREIGN_KEY_CHECKS = 1;';
     public function tofetch($comdata)
     {
 
-        $date = $date;
-        $flightnum = $flight;
         $date = date("Y-m-d", strtotime($comdata['date']));
         $flightnum = $comdata['flightnum'];
         $url = "http://www.umetrip.com/mskyweb/fs/fc.do?&channel=&flightNo={$flightnum}&date={$date}";
@@ -304,6 +305,8 @@ SET FOREIGN_KEY_CHECKS = 1;';
         if ($res[1]) {
             $tnum = count($res[1]);
             $fnumus = $tnum - 1;
+            $s = '';
+            $e = '';
             for ($i = 0; $i < $tnum; ++$i) {
                 $txt = '';
                 $ahead = '';
@@ -321,6 +324,8 @@ SET FOREIGN_KEY_CHECKS = 1;';
                 $weather = '';
                 preg_match('/机场(.*)\((.*)\)/is', $res[1][$i], $txt);
                 $airport = trim($txt[2]);
+                if($i == 0) $s = $airport;
+                if($i == $fnumus) $e = $airport;
                 preg_match('/前序航班(.*?)\[/is', $res[1][$i], $ahead);
                 $aheadflight = trim($ahead[1]);
                 preg_match('/已于(.*?)到达/is', $res[1][$i], $aheadt);
@@ -353,7 +358,8 @@ SET FOREIGN_KEY_CHECKS = 1;';
                 $newdata[2] = $p3arr[0][2];
                 $newdata[3] = $p3arr[0][3];
                 $newdata[4] = $p3arr[0][4];
-                $this->addflightcon($comdata['flyairport'], $comdata['destination'], $newdata, 1, $comdata);
+                //$this->addflightcon($comdata['flyairport'], $comdata['destination'], $newdata, 1, $comdata);
+                $this->addflightcon($s, $e, $newdata, 1, $comdata);
             }
         }
     }
