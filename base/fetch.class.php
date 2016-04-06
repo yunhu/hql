@@ -186,8 +186,7 @@ SET FOREIGN_KEY_CHECKS = 1;';
     {
         $this->getMysql();
         //$sql = 'select *  from `'. $this->table . '`';
-        $sql = 'SELECT count(DISTINCT flightnum) from `'. $this->table . '`';
-        var_dump($sql);
+        $sql = 'SELECT DISTINCT flightnum as id from `'. $this->table . '`';
         $sth = self::$mysql->prepare($sql);
         $sth->execute();
         return $sth->rowCount();
@@ -270,7 +269,12 @@ SET FOREIGN_KEY_CHECKS = 1;';
             preg_match_all('/<li (.*?)>(.*?)<span>(.*?)<\/span>/is', $v, $tmp);
             $return[$k][] = str_replace('公里', '', $tmp[3][1]);
             preg_match('/(.*?)小时(.*?)分/', $tmp[3][2], $ptime);
-            $return[$k][] = intval($ptime[1]) * 60 + intval($ptime[2]);
+            if(!$ptime){
+                preg_match('/(.*?)小时|(.*?)分/', $tmp[3][2], $ptime);
+                $return[$k][] =  intval($ptime[2]);
+            }else{
+                $return[$k][] = intval($ptime[1]) * 60 + intval($ptime[2]);
+            }
             list($type, $age) = explode('/', $tmp[3][3]);
             $age = str_replace('月', '', $age);
             $age = str_replace('年', '', $age);
